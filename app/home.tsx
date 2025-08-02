@@ -21,6 +21,8 @@ import ReviewService from '../services/reviewService';
 import UserService from '../services/userService';
 import Review from '../types/reviewType';
 import axios from 'axios';
+import tokenManagerInstance from '../services/tokenManager';
+import PopularArtists from '../components/popularAlbums';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +34,10 @@ type Album = {
     url: string
   }[];
 };
+
+tokenManagerInstance.setupAxiosInterceptor();
+
+
 
 const TabBar = ({ activeTab, setActiveTab }: { activeTab: number; setActiveTab: (i: number) => void }) => {
   const tabs = ['Álbums e Singles', 'Reviews', 'Acervo'];
@@ -68,6 +74,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const fetchReviewsFromFollowing = async () => {
+
       try {
         setLoading(true);
         const id = await AsyncStorage.getItem('userid');
@@ -116,7 +123,12 @@ export default function HomeScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.albumList}>
             {albuns.map((album) => (
               <View key={album.id} style={styles.albumCard}>
-                <TouchableOpacity onPress={() => router.push(`/albumPage/${album.id}`)}>
+                <TouchableOpacity onPress={() => router.push({
+                  pathname: `albumPage`,
+                  params: {
+                    id: album.id
+                  }
+                })}>
                   <Image source={{ uri: album.images[0]?.url }} style={styles.albumCover} />
                 </TouchableOpacity>
               </View>

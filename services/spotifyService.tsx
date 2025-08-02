@@ -1,22 +1,25 @@
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// spotifyService.ts
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const spotifyService = {
+export const fetchTopAlbums = async () => {
+  try {
+    const accessToken = await AsyncStorage.getItem('accessToken');
+    if (!accessToken) throw new Error("Token não encontrado");
 
-    async searchByName (query: string, type: "album" | "artist") {
-        const token = await AsyncStorage.getItem('accessToken');
+    const playlistId = '37i9dQZEVXbLRQDuF5jeBp'; // Top 50 Global
+    const url = `https://api.spotify.com/v1/playlists/${playlistId}`;
 
-    const response = await axios.get("https://api.spotify.com/v1/search", {
-        headers: {
-        Authorization: `Bearer ${token}`,
-        },
-        params: {
-        q: query,
-        type: type,
-        limit: 10,
-        },
+    const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
     });
+    console.log(response)
 
-    return response.data;
-    }
-}
+    const tracks = response.data.tracks.items;
+    const albums = tracks.map((item: any) => item.track.album);
+    return albums;
+  }
+  catch (error) {
+    console.log(error)
+  }
+};

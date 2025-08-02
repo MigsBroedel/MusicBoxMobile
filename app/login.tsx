@@ -130,8 +130,7 @@ export default function LoginScreen() {
           
           <View style={styles.contentContainer}>
             <Ionicons name="headset" size={30} color={"white"}/>
-            <Text style={styles.title}>Music Rater</Text>
-            <Text style={styles.subtitle}>Avalie suas músicas favoritas</Text>
+            <Text style={styles.title}>MusicBoxd</Text>
             
             {/* Spotify Login Button with Liquid Glass Effect */}
             <TouchableOpacity 
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(6, 20, 65, 0.7)',
+    backgroundColor: 'rgba(0, 61, 31, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -212,7 +211,7 @@ const styles = StyleSheet.create({
   buttonBlur: {
     width: '100%',
     height: '100%',
-    borderRadius: 30,
+    borderRadius: 15,
     overflow: 'hidden',
   },
   buttonGradient: {
@@ -221,7 +220,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 30,
+    borderRadius: 15,
   },
   buttonIcon: {
     marginRight: 10,

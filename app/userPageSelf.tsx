@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, View, Dimensions, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { ScrollView, StyleSheet, View, Dimensions, Text, Image, TouchableOpacity, ActivityIndicator, Share } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@rneui/base";
@@ -103,6 +103,30 @@ export default function UserPage() {
   const [followingCount, setFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        title: 'Confira este perfil!',
+        message: `Dá uma olhada nesse perfil: https://musicbox.com/userPageShare/${userId}`,
+        url: `https://musicbox.com/userPageShare/${userId}`, // para iOS
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Compartilhado com uma atividade específica
+          console.log('Compartilhado com atividade:', result.activityType);
+        } else {
+          // Compartilhado
+          console.log('Compartilhado com sucesso');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        console.log('Compartilhamento cancelado');
+      }
+    } catch (error) {
+      alert('Erro ao compartilhar');
+    }
+  }
 
   const fetchUser = async (id: string) => {
     try {
@@ -318,7 +342,7 @@ export default function UserPage() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity style={styles.shareButton}>
+              <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
                 <Ionicons name="share-outline" size={20} color="white" />
               </TouchableOpacity>
             </View>
