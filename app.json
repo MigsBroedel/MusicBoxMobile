@@ -3,7 +3,6 @@
     "name": "musicbox",
     "slug": "musicbox",
     "scheme": "musicbox",
-    "deepLinking": true,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,7 +22,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.migsbroed.musicbox"
+      "package": "com.migsbroed.musicbox",
+      "manifestPlaceholders": {
+        "appAuthRedirectScheme": "musicbox"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -34,6 +36,9 @@
         "projectId": "fb4de38f-3df6-4411-9ee1-07d53aca602c"
       }
     },
-    "owner": "migsbroed"
+    "owner": "migsbroed",
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

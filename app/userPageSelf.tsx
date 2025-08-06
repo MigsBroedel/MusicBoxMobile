@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, StyleSheet, View, Dimensions, Text, Image, TouchableOpacity, ActivityIndicator, Share } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "@rneui/base";
+import { Button } from 'react-native-elements';
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
