@@ -15,7 +15,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'  # Atualizado para Node 20 (LTS atual)
+        node-version: '20'
         cache: 'npm'
     
     - name: Setup Java
@@ -32,6 +32,12 @@ jobs:
     
     - name: Prebuild
       run: npx expo prebuild --no-install
+    
+    - name: Set Gradlew permissions
+      run: |
+        cd android
+        chmod +x gradlew
+        cd ..
     
     - name: Build APK
       run: |
