@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import axios from 'axios';
 
+
 interface LoginStep {
   message: string;
   type: 'info' | 'success' | 'error';
@@ -25,6 +26,7 @@ interface UserData {
 
 const { width, height } = Dimensions.get('window');
 
+// Spotify OAuth endpoints
 const discovery = {
   authorizationEndpoint: 'https://accounts.spotify.com/authorize',
   tokenEndpoint: 'https://accounts.spotify.com/api/token',
@@ -35,24 +37,27 @@ export default function LoginScreen() {
   const [loginSteps, setLoginSteps] = useState<LoginStep[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // Função para adicionar step de login
   const addLoginStep = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
     const timestamp = new Date().toLocaleTimeString();
     setLoginSteps(prev => [...prev, { message, type, timestamp }]);
     console.log(message);
   };
 
+  // Configure AuthRequest
   const redirectUri: string = "musicbox://login";
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: 'f1279cc7c8c246f49bad620c58811730',
-      scopes: ['user-read-email', 'user-library-read', 'user-read-private'],
-      redirectUri,
-      responseType: 'code' as AuthSession.ResponseType,
-      usePKCE: true,
-    },
-    discovery
-  );
+  {
+    clientId: 'f1279cc7c8c246f49bad620c58811730',
+    scopes: ['user-read-email', 'user-library-read', 'user-read-private'],
+    redirectUri,
+    responseType: 'code' as AuthSession.ResponseType,
+    // usePKCE: true // opcional, true por padrão
+  },
+  discovery
+);
 
+  // Handle Spotify OAuth response
   useEffect(() => {
     if (response?.type === 'success') {
       const code: string = response.params.code;
@@ -64,90 +69,32 @@ export default function LoginScreen() {
   }, [response, navigation]);
 
   useEffect(() => {
-    if (response?.type === 'success') {
-      setIsLoading(true);
-      const code: string = response.params.code;
-      const codeVerifier: string | undefined = request?.codeVerifier;
-      
-      addLoginStep('🔄 Iniciando troca de código por tokens...', 'info');
-      
-      fetch(`https://musicboxdback.onrender.com/auth/callback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          code: code, 
-          codeVerifier: codeVerifier 
-        }),
-      })
-      .then(async (res: Response) => {
-        if (!res.ok) {
-          const errorData = await res.json();
-          addLoginStep(`❌ Erro na resposta do servidor: ${res.status} - ${errorData.message || 'Sem detalhes'}`, 'error');
-          throw new Error('Falha na troca de código');
-        }
-        
-        const data: { 
-          access_token: string; 
-          refresh_token: string;
-          user?: any;
-        } = await res.json();
-        
-        addLoginStep('🎯 Tokens recebidos com sucesso!', 'success');
-        
-        const { access_token, refresh_token } = data;
-        
-        // Verificação imediata do token
-        addLoginStep('🔍 Verificando token com a API do Spotify...', 'info');
-        const meResponse = await fetch(`https://api.spotify.com/v1/me`, {
-          headers: {
-            'Authorization': `Bearer ${access_token}`,
-          },
-        });
-
-        if (!meResponse.ok) {
-          const errorText = await meResponse.text();
-          addLoginStep(`❌ Falha na verificação do token: ${meResponse.status} - ${errorText}`, 'error');
-          throw new Error('Token inválido');
-        }
-
-        const meData = await meResponse.json();
-        addLoginStep(`✅ Token verificado! Usuário: ${meData.display_name || meData.id}`, 'success');
-        
-        // Armazenamento dos tokens
-        addLoginStep('💾 Armazenando tokens...', 'info');
-        await AsyncStorage.setItem("accessToken", access_token);
-        await AsyncStorage.setItem("refreshToken", refresh_token);
-        
-        // Processamento do usuário no backend
-        addLoginStep('🔄 Processando usuário no backend...', 'info');
-        const userRes = await axios.post<UserData>(
-          `https://musicboxdback.onrender.com/users/logProcess/${meData.id}`,
-          { name: meData.display_name }
-        );
-
-        if (!userRes.data) {
-          throw new Error('Falha ao processar usuário');
-        }
-
-        const user = userRes.data;
-        await AsyncStorage.setItem('userid', user.id);
-        await AsyncStorage.setItem('username', user.display_name || '');
-        await AsyncStorage.setItem('spotifyID', user.spotifyID);
-        
-        addLoginStep('🚀 Redirecionando para home...', 'success');
-        router.replace('home');
-      })
-      .catch((err: Error) => {
-        addLoginStep(`❌ Erro: ${err.message}`, 'error');
-        console.error('Erro completo:', err);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [response]);
+  if (response?.type === 'success') {
+    const code = response.params.code;
+    const codeVerifier = request?.codeVerifier; // importante
+    // envia também o redirectUri usado
+    fetch('https://musicboxdback.onrender.com/auth/callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, codeVerifier, redirect_uri: redirectUri }),
+    })
+    .then(async (res) => {
+      const body = await res.json();
+      if (!res.ok) {
+        console.error('Erro do backend na troca:', res.status, body);
+        // mostre no UI
+        throw new Error(JSON.stringify(body));
+      }
+      return body;
+    })
+    .then((data) => {
+      // data.access_token, data.refresh_token
+    })
+    .catch((err) => {
+      console.error(err);
+    });
+  }
+}, [response]);
 
   const handleSpotifyLogin = (): void => {
     setLoginSteps([]);
@@ -157,14 +104,19 @@ export default function LoginScreen() {
 
   const getStepColor = (type: 'info' | 'success' | 'error'): string => {
     switch (type) {
-      case 'success': return '#4CAF50';
-      case 'error': return '#F44336';
-      default: return '#2196F3';
+      case 'success':
+        return '#4CAF50';
+      case 'error':
+        return '#F44336';
+      case 'info':
+      default:
+        return '#2196F3';
     }
   };
 
   return (
     <View style={styles.overlay}>
+      {/* Liquid Glass Effect Container */}
       <BlurView intensity={30} tint="dark" style={styles.glassContainer}>
         <LinearGradient
           colors={['rgba(10, 17, 0, 0.99)', 'rgba(34, 34, 34, 1)']}
@@ -175,9 +127,11 @@ export default function LoginScreen() {
           <Ionicons name="headset" size={30} color={"white"}/>
           <Text style={styles.title}>MusicBoxd</Text>
           
+          {/* Spotify Login Button */}
           <TouchableOpacity 
             style={[styles.spotifyButton, isLoading && styles.disabledButton]}
             onPress={handleSpotifyLogin}
+            activeOpacity={0.8}
             disabled={isLoading}
           >
             <BlurView intensity={20} tint="light" style={styles.buttonBlur}>
@@ -191,6 +145,7 @@ export default function LoginScreen() {
                   name={isLoading ? "hourglass" : "musical-notes"} 
                   size={24} 
                   color="white" 
+                  style={styles.buttonIcon} 
                 />
                 <Text style={styles.buttonText}>
                   {isLoading ? 'Processando...' : 'Login com Spotify'}
@@ -199,10 +154,11 @@ export default function LoginScreen() {
             </BlurView>
           </TouchableOpacity>
 
+          {/* Login Steps Display */}
           {loginSteps.length > 0 && (
             <View style={styles.stepsContainer}>
               <Text style={styles.stepsTitle}>Status do Login:</Text>
-              <ScrollView style={styles.stepsScrollView}>
+              <ScrollView style={styles.stepsScrollView} showsVerticalScrollIndicator={false}>
                 {loginSteps.map((step, index) => (
                   <View key={index} style={styles.stepItem}>
                     <View style={[styles.stepIndicator, { backgroundColor: getStepColor(step.type) }]} />
@@ -220,7 +176,6 @@ export default function LoginScreen() {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
