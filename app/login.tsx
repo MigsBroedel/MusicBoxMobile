@@ -143,7 +143,7 @@ export default function LoginScreen() {
           addLoginStep('🚀 Redirecionando para home...', 'success');
           setTimeout(() => {
             router.replace('home');
-          }, 2000);
+          }, 1000);
           
         } catch (err: unknown) {
           const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';

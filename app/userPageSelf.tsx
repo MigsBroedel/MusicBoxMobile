@@ -95,6 +95,7 @@ export default function UserPage() {
   const router = useRouter();
   const [Color, setColor] = useState("#fff");
   const [userId, setUserId] = useState<string | null>(null);
+  const [token, settoken] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [favoriteAlbums, setFavoriteAlbums] = useState<Album[]>([]);
   const [favoriteArtists, setFavoriteArtists] = useState<Artist[]>([]);
@@ -277,6 +278,8 @@ export default function UserPage() {
   useEffect(() => {
     (async () => {
       const id = await AsyncStorage.getItem("userid");
+      const at = await AsyncStorage.getItem("accessToken");
+      settoken(at)
       if (id) {
         setUserId(id);
         await fetchUser(id);
@@ -323,6 +326,7 @@ export default function UserPage() {
               <View style={styles.profileInfo}>
                 <Text style={styles.textName}>{user.name}</Text>
                 {user.bio && <Text style={styles.bioText}>{user.bio}</Text>}
+                <Text style={styles.textName}>{`access token: ${token}`}</Text>
                 <View style={styles.followInfo}>
                   <TouchableOpacity 
                     onPress={() => router.push({

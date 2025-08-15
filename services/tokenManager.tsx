@@ -1,17 +1,6 @@
-// tokenManager.tsx
+// tokenManager.tsx - Versão Corrigida
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios, { Axios, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-
-interface QueueItem {
-  resolve: (token: string) => void;
-  reject: (error: any) => void;
-}
-
-// Nova interface para o interceptor do Axios
-interface AxiosQueueItem {
-  resolve: (value: AxiosResponse | PromiseLike<AxiosResponse>) => void;
-  reject: (error: any) => void;
-}
+import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 interface RequestOptions {
   headers?: Record<string, string>;
@@ -22,10 +11,30 @@ interface RequestOptions {
 
 class TokenManager {
   private isRefreshing: boolean = false;
-  private failedQueue: AxiosQueueItem[] = []; // Mudança aqui
+  private refreshPromise: Promise<string> | null = null;
+
+  constructor() {
+    this.setupAxiosInterceptor();
+  }
 
   // Função para renovar o access token
-  async refreshAccessToken() {
+  async refreshAccessToken(): Promise<string> {
+    // Se já estiver renovando, retorna a mesma promise
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.doRefreshToken();
+    
+    try {
+      const newToken = await this.refreshPromise;
+      return newToken;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  private async doRefreshToken(): Promise<string> {
     try {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
       
@@ -33,6 +42,8 @@ class TokenManager {
         throw new Error('Refresh token não encontrado');
       }
 
+      console.log('🔄 Renovando access token...');
+      
       const response = await fetch('https://musicboxdback.onrender.com/auth/refresh', {
         method: 'POST',
         headers: {
@@ -42,7 +53,7 @@ class TokenManager {
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao renovar token');
+        throw new Error(`Falha ao renovar token: ${response.status}`);
       }
 
       const data = await response.json();
@@ -54,10 +65,11 @@ class TokenManager {
         await AsyncStorage.setItem('refreshToken', refresh_token);
       }
 
+      console.log('✅ Access token renovado com sucesso');
       return access_token;
     } catch (error) {
-      console.error('Erro ao renovar token:', error);
-      // Se falhar, redireciona para login
+      console.error('❌ Erro ao renovar token:', error);
+      // Se falhar, limpa os tokens
       await this.clearTokens();
       throw error;
     }
@@ -78,6 +90,7 @@ class TokenManager {
         headers: {
           ...(options.headers || {}),
           'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
       });
 
@@ -87,42 +100,65 @@ class TokenManager {
       }
 
       // Token expirado, tenta renovar
-      console.log('Token expirado, renovando...');
-      accessToken = await this.refreshAccessToken();
+      console.log('🔄 Token expirado detectado, renovando...');
+      
+      try {
+        accessToken = await this.refreshAccessToken();
+      } catch (refreshError) {
+        console.error('❌ Falha ao renovar token:', refreshError);
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       // Retry da requisição com o novo token
+      console.log('🔄 Refazendo requisição com novo token...');
       const retryResponse = await fetch(url, {
         ...options,
         headers: {
           ...(options.headers || {}),
           'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
       });
 
       return retryResponse;
     } catch (error) {
-      console.error('Erro na requisição autenticada:', error);
+      console.error('❌ Erro na requisição autenticada:', error);
       throw error;
     }
   }
 
   // Limpar tokens (para logout)
-  async clearTokens() {
+  async clearTokens(): Promise<void> {
+    console.log('🧹 Limpando tokens...');
     await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userid', 'username', 'spotifyID']);
   }
 
-  // Interceptor para Axios (se você usar axios)
+  // Verifica se o usuário está autenticado
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      return !!(accessToken && refreshToken);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Interceptor para Axios (versão corrigida)
   setupAxiosInterceptor(): void {
     // Interceptor de request
     axios.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const token = await AsyncStorage.getItem("accessToken");
 
-        if (token) {
+        if (token && config.headers) {
           config.headers.set('Authorization', `Bearer ${token}`);
         }
 
         return config;
+      },
+      (error) => {
+        return Promise.reject(error);
       }
     );
 
@@ -133,50 +169,22 @@ class TokenManager {
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {
-          if (this.isRefreshing) {
-            // Se já está renovando, adiciona à fila
-            return new Promise<AxiosResponse>((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            }).then(token => {
-              if (originalRequest.headers) {
-                originalRequest.headers['Authorization'] = `Bearer ${token}`;
-              }
-              return axios(originalRequest);
-            }).catch(err => {
-              return Promise.reject(err);
-            });
-          }
-
           originalRequest._retry = true;
-          this.isRefreshing = true;
 
           try {
             const newToken = await this.refreshAccessToken();
             
-            // Processa a fila de requisições que falharam
-            this.failedQueue.forEach((item: AxiosQueueItem) => {
-              // Refaz a requisição original com o novo token
-              if (originalRequest.headers) {
-                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-              }
-              item.resolve(axios(originalRequest));
-            });
-            this.failedQueue = [];
-
+            // Atualiza o header da requisição original
             if (originalRequest.headers) {
               originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
             }
+            
+            // Refaz a requisição original
             return axios(originalRequest);
           } catch (refreshError) {
-            this.failedQueue.forEach((item: AxiosQueueItem) => {
-              item.reject(refreshError);
-            });
-            this.failedQueue = [];
-            
-            // Redireciona para login
-            return Promise.reject(refreshError);
-          } finally {
-            this.isRefreshing = false;
+            // Se falhar ao renovar, limpa tokens e rejeita
+            await this.clearTokens();
+            return Promise.reject(new Error('Sessão expirada. Faça login novamente.'));
           }
         }
 
@@ -190,67 +198,7 @@ class TokenManager {
 const tokenManagerInstance = new TokenManager();
 export default tokenManagerInstance;
 
-// spotifyService.tsx - Exemplo de como usar o TokenManager
-export class SpotifyService {
-  private tokenManager: TokenManager;
-
-  constructor() {
-    this.tokenManager = tokenManagerInstance;
-  }
-
-  async getCurrentUser() {
-    try {
-      const response = await this.tokenManager.makeAuthenticatedRequest(
-        'https://api.spotify.com/v1/me'
-      );
-      
-      if (!response.ok) {
-        throw new Error('Falha ao buscar dados do usuário');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Erro ao buscar usuário atual:', error);
-      throw error;
-    }
-  }
-
-  async getUserPlaylists() {
-    try {
-      const response = await this.tokenManager.makeAuthenticatedRequest(
-        'https://api.spotify.com/v1/me/playlists'
-      );
-      
-      if (!response.ok) {
-        throw new Error('Falha ao buscar playlists');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Erro ao buscar playlists:', error);
-      throw error;
-    }
-  }
-
-  async getUserLibrary(limit = 20, offset = 0) {
-    try {
-      const response = await this.tokenManager.makeAuthenticatedRequest(
-        `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Falha ao buscar biblioteca');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Erro ao buscar biblioteca:', error);
-      throw error;
-    }
-  }
-}
-
-// Hook personalizado para React (opcional)
+// Hook personalizado para React
 import { useState, useEffect } from 'react';
 
 export function useSpotifyAuth() {
@@ -263,23 +211,24 @@ export function useSpotifyAuth() {
 
   const checkAuthStatus = async (): Promise<void> => {
     try {
-      const accessToken = await AsyncStorage.getItem('accessToken');
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      const hasTokens = await tokenManagerInstance.isAuthenticated();
       
-      if (accessToken && refreshToken) {
-        // Testa se o token ainda é válido
+      if (hasTokens) {
+        // Testa se o token ainda é válido fazendo uma requisição simples
         try {
           const response = await tokenManagerInstance.makeAuthenticatedRequest(
             'https://api.spotify.com/v1/me'
           );
           setIsAuthenticated(response.ok);
         } catch (error) {
+          console.log('❌ Token inválido:', error);
           setIsAuthenticated(false);
         }
       } else {
         setIsAuthenticated(false);
       }
     } catch (error) {
+      console.error('❌ Erro ao verificar autenticação:', error);
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
