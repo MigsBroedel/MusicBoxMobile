@@ -49,7 +49,7 @@ export default function LoginScreen() {
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: 'f1279cc7c8c246f49bad620c58811730',
-      scopes: ['user-read-email', 'user-library-read'],
+      scopes: ['user-read-email', 'user-library-read', 'user-read-private'],
       redirectUri,
       responseType: 'code' as AuthSession.ResponseType,
     },
@@ -80,7 +80,7 @@ export default function LoginScreen() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code, codeVerifier }),
+        body: JSON.stringify({ "code": code, "codeVerifier": codeVerifier }),
       })
       .then(async (res: Response) => {
         if (!res.ok) {
