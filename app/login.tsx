@@ -75,7 +75,7 @@ export default function LoginScreen() {
       
       addLoginStep('🔄 Iniciando troca de código por tokens...', 'info');
       
-      fetch(`https://musicboxdback.onrender.com/auth/callback?code=${code}`, {
+      fetch(`https://musicboxdback.onrender.com/auth/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
