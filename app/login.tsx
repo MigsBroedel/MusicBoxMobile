@@ -10,7 +10,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import axios from 'axios';
 
-
 interface LoginStep {
   message: string;
   type: 'info' | 'success' | 'error';
@@ -24,6 +23,13 @@ interface UserData {
   spotifyID: string;
 }
 
+interface SpotifyTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  scope: string;
+}
+
 const { width, height } = Dimensions.get('window');
 
 // Spotify OAuth endpoints
@@ -31,6 +37,10 @@ const discovery = {
   authorizationEndpoint: 'https://accounts.spotify.com/authorize',
   tokenEndpoint: 'https://accounts.spotify.com/api/token',
 };
+
+const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
+const REDIRECT_URI = 'musicbox://login';
+const BACKEND_URL = 'https://musicboxdback.onrender.com';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -41,65 +51,158 @@ export default function LoginScreen() {
   const addLoginStep = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
     const timestamp = new Date().toLocaleTimeString();
     setLoginSteps(prev => [...prev, { message, type, timestamp }]);
-    console.log(message);
+    console.log(`[${timestamp}] ${message}`);
   };
 
-  // Configure AuthRequest
-  const redirectUri: string = "musicbox://login";
+  // Configure AuthRequest com PKCE
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
-  {
-    clientId: 'f1279cc7c8c246f49bad620c58811730',
-    scopes: ['user-read-email', 'user-library-read', 'user-read-private'],
-    redirectUri,
-    responseType: 'code' as AuthSession.ResponseType,
-    // usePKCE: true // opcional, true por padrão
-  },
-  discovery
-);
+    {
+      clientId: CLIENT_ID,
+      scopes: [
+        'user-read-email', 
+        'user-read-private', 
+        'user-library-read',
+        'user-read-playback-state',
+        'user-modify-playback-state'
+      ],
+      redirectUri: REDIRECT_URI,
+      responseType: AuthSession.ResponseType.Code,
+      usePKCE: true, // Importante: ativar PKCE
+      extraParams: {
+        code_challenge_method: 'S256'
+      }
+    },
+    discovery
+  );
 
   // Handle Spotify OAuth response
   useEffect(() => {
     if (response?.type === 'success') {
-      const code: string = response.params.code;
-      addLoginStep('✅ Login com Spotify bem-sucedido!', 'success');
-      addLoginStep(`📝 Código de autorização recebido: ${code.substring(0, 20)}...`, 'info');
+      setIsLoading(true);
+      handleSuccessfulAuth(response.params.code);
     } else if (response?.type === 'error') {
-      addLoginStep(`❌ Falha no login com Spotify: ${response.error || 'Erro desconhecido'}`, 'error');
+      addLoginStep(`❌ Erro no OAuth: ${response.error?.description || response.error || 'Erro desconhecido'}`, 'error');
+      setIsLoading(false);
+    } else if (response?.type === 'cancel') {
+      addLoginStep('⚠️ Login cancelado pelo usuário', 'error');
+      setIsLoading(false);
     }
-  }, [response, navigation]);
+  }, [response]);
 
-  useEffect(() => {
-  if (response?.type === 'success') {
-    const code = response.params.code;
-    const codeVerifier = request?.codeVerifier; // importante
-    // envia também o redirectUri usado
-    fetch('https://musicboxdback.onrender.com/auth/callback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, codeVerifier, redirect_uri: redirectUri }),
-    })
-    .then(async (res) => {
-      const body = await res.json();
-      if (!res.ok) {
-        console.error('Erro do backend na troca:', res.status, body);
-        // mostre no UI
-        throw new Error(JSON.stringify(body));
+  const handleSuccessfulAuth = async (authCode: string) => {
+    try {
+      addLoginStep('✅ Código de autorização recebido!', 'success');
+      addLoginStep(`📝 Código: ${authCode.substring(0, 20)}...`, 'info');
+      
+      // Verificar se temos o codeVerifier
+      if (!request?.codeVerifier) {
+        throw new Error('Code verifier não encontrado. Tente fazer login novamente.');
       }
-      return body;
-    })
-    .then((data) => {
-      // data.access_token, data.refresh_token
-    })
-    .catch((err) => {
-      console.error(err);
-    });
-  }
-}, [response]);
 
-  const handleSpotifyLogin = (): void => {
+      addLoginStep('🔄 Trocando código por tokens...', 'info');
+
+      // Enviar para o backend
+      const tokenResponse = await axios.post(`${BACKEND_URL}/auth/callback`, {
+        code: authCode,
+        codeVerifier: request.codeVerifier,
+        redirect_uri: REDIRECT_URI
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      const tokens: SpotifyTokenResponse = tokenResponse.data;
+      addLoginStep('🎉 Tokens recebidos com sucesso!', 'success');
+
+      // Salvar tokens localmente
+      await AsyncStorage.multiSet([
+        ['spotify_access_token', tokens.access_token],
+        ['spotify_refresh_token', tokens.refresh_token],
+        ['spotify_expires_in', tokens.expires_in.toString()],
+        ['spotify_token_timestamp', Date.now().toString()]
+      ]);
+
+      addLoginStep('💾 Tokens salvos localmente', 'success');
+
+      // Buscar dados do usuário
+      await fetchUserData(tokens.access_token);
+
+      // Navegar para a tela principal
+      addLoginStep('🚀 Login completo! Redirecionando...', 'success');
+      
+      setTimeout(() => {
+        router.replace('/home'); // Ou a tela que você quiser
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Erro completo:', error);
+      
+      let errorMessage = 'Erro desconhecido';
+      
+      if (error.response?.data) {
+        // Erro do backend
+        const backendError = error.response.data;
+        if (backendError.spotify_error) {
+          errorMessage = `Spotify API: ${backendError.spotify_error.error_description || backendError.spotify_error.error || 'Erro na API'}`;
+        } else {
+          errorMessage = `Backend: ${backendError.message || 'Erro no servidor'}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      addLoginStep(`❌ Falha na autenticação: ${errorMessage}`, 'error');
+      setIsLoading(false);
+    }
+  };
+
+  const fetchUserData = async (accessToken: string) => {
+    try {
+      addLoginStep('👤 Buscando dados do usuário...', 'info');
+      
+      const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        },
+        timeout: 10000
+      });
+
+      const userData = userResponse.data;
+      
+      // Salvar dados do usuário
+      await AsyncStorage.setItem('user_data', JSON.stringify({
+        id: userData.id,
+        display_name: userData.display_name,
+        email: userData.email,
+        country: userData.country,
+        followers: userData.followers?.total || 0,
+        images: userData.images || []
+      }));
+
+      addLoginStep(`✅ Bem-vindo, ${userData.display_name || userData.id}!`, 'success');
+
+    } catch (error: any) {
+      console.error('Erro ao buscar dados do usuário:', error);
+      addLoginStep('⚠️ Erro ao buscar dados do usuário, mas login foi bem-sucedido', 'error');
+    }
+  };
+
+  const handleSpotifyLogin = async (): Promise<void> => {
+    if (isLoading) return;
+
     setLoginSteps([]);
-    addLoginStep('🎵 Iniciando login com Spotify...', 'info');
-    promptAsync();
+    setIsLoading(true);
+    addLoginStep('🎵 Iniciando autenticação com Spotify...', 'info');
+    
+    try {
+      await promptAsync();
+    } catch (error: any) {
+      console.error('Erro ao iniciar prompt:', error);
+      addLoginStep(`❌ Erro ao iniciar login: ${error.message}`, 'error');
+      setIsLoading(false);
+    }
   };
 
   const getStepColor = (type: 'info' | 'success' | 'error'): string => {
