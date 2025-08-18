@@ -125,8 +125,8 @@ const Sidebar: React.FC = () => {
               {/* Header da Sidebar */}
               <View style={styles.sidebarHeader}>
                 <View style={styles.headerContent}>
-                  <Ionicons name="musical-notes" size={32} color="#1DB954" />
-                  <Text style={styles.appTitle}>MusicApp</Text>
+                  <Ionicons name="musical-notes" size={32} color="#EAEA54" />
+                  <Text style={styles.appTitle}>Syntha</Text>
                 </View>
                 <TouchableOpacity onPress={closeSidebar} style={styles.closeButton}>
                   <Ionicons name="close" size={28} color="#fff" />

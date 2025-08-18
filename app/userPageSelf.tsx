@@ -326,7 +326,7 @@ export default function UserPage() {
               <View style={styles.profileInfo}>
                 <Text style={styles.textName}>{user.name}</Text>
                 {user.bio && <Text style={styles.bioText}>{user.bio}</Text>}
-                <Text style={styles.textName}>{`access token: ${token}`}</Text>
+                
                 <View style={styles.followInfo}>
                   <TouchableOpacity 
                     onPress={() => router.push({

@@ -463,6 +463,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    margin: 10
   },
   headerTop: {
     flexDirection: 'row',
@@ -554,7 +555,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   exploreButton: {
-    backgroundColor: '#1DB954',
+    backgroundColor: '#007196',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 24,

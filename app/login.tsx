@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
@@ -39,7 +39,7 @@ const discovery = {
 };
 
 const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
-const REDIRECT_URI = 'musicbox://login';
+const REDIRECT_URI = 'exp://192.168.15.9:8081';
 const BACKEND_URL = 'https://musicboxdback.onrender.com';
 
 export default function LoginScreen() {
@@ -59,12 +59,16 @@ export default function LoginScreen() {
     {
       clientId: CLIENT_ID,
       scopes: [
-        'user-read-email', 
-        'user-read-private', 
+        'user-read-email',
+        'user-read-private',
         'user-library-read',
+        'user-top-read',
+        'playlist-read-private',
+        'playlist-read-collaborative',
         'user-read-playback-state',
         'user-modify-playback-state'
       ],
+
       redirectUri: REDIRECT_URI,
       responseType: AuthSession.ResponseType.Code,
       usePKCE: true, // Importante: ativar PKCE
@@ -113,13 +117,17 @@ export default function LoginScreen() {
         timeout: 15000
       });
 
+      console.log(tokenResponse.data)
+
       const tokens: SpotifyTokenResponse = tokenResponse.data;
       addLoginStep('🎉 Tokens recebidos com sucesso!', 'success');
 
+      console.log("Access Token recebido:", tokens.access_token);
+
       // Salvar tokens localmente
       await AsyncStorage.multiSet([
-        ['spotify_access_token', tokens.access_token],
-        ['spotify_refresh_token', tokens.refresh_token],
+        ['accessToken', tokens.access_token],
+        ['refreshToken', tokens.refresh_token],
         ['spotify_expires_in', tokens.expires_in.toString()],
         ['spotify_token_timestamp', Date.now().toString()]
       ]);
@@ -158,24 +166,55 @@ export default function LoginScreen() {
     }
   };
 
+  const userLogProccessSpotify = async (spotifyID: string, name?: string) => {
+  try {
+    const res = await fetch(`https://musicboxdback.onrender.com/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro: ${res.status}`);
+    }
+
+    const user = await res.json();
+    console.log("Usuário retornado:", user);
+    return user;
+  } catch (err) {
+    console.error("Erro no login:", err);
+  }
+}
+
   const fetchUserData = async (accessToken: string) => {
     try {
       addLoginStep('👤 Buscando dados do usuário...', 'info');
+
+      console.log(accessToken)
       
       const userResponse = await axios.get('https://api.spotify.com/v1/me', {
         headers: {
+          "Content-Type": "application/json",
           'Authorization': `Bearer ${accessToken}`
         },
         timeout: 10000
       });
 
+
       const userData = userResponse.data;
+
+      const responseProccess = await userLogProccessSpotify(userData.id, userData.display_name)
+
+      console.log(responseProccess)
+
+      await AsyncStorage.setItem("userid", responseProccess.id)
       
       // Salvar dados do usuário
       await AsyncStorage.setItem('user_data', JSON.stringify({
         id: userData.id,
-        display_name: userData.display_name,
-        email: userData.email,
+        display_name: userData.display_name || 'Usuário Spotify',
+        email: userData.email || `${userData.id}@spotify.local`, // fallback
         country: userData.country,
         followers: userData.followers?.total || 0,
         images: userData.images || []
@@ -184,6 +223,7 @@ export default function LoginScreen() {
       addLoginStep(`✅ Bem-vindo, ${userData.display_name || userData.id}!`, 'success');
 
     } catch (error: any) {
+      
       console.error('Erro ao buscar dados do usuário:', error);
       addLoginStep('⚠️ Erro ao buscar dados do usuário, mas login foi bem-sucedido', 'error');
     }
@@ -227,8 +267,8 @@ export default function LoginScreen() {
         />
         
         <View style={styles.contentContainer}>
-          <Ionicons name="headset" size={30} color={"white"}/>
-          <Text style={styles.title}>MusicBoxd</Text>
+          <Image source={require('../assets/icon.png')} style={{height: 150, width: 150, borderRadius: 15}}/>
+          <Text style={styles.title}>Syntha</Text>
           
           {/* Spotify Login Button */}
           <TouchableOpacity 
@@ -288,7 +328,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 61, 31, 0.7)',
+    backgroundColor: '#007196',
     justifyContent: 'center',
     alignItems: 'center',
   },
