@@ -39,7 +39,7 @@ const discovery = {
 };
 
 const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
-const REDIRECT_URI = 'exp://192.168.15.9:8081';
+const REDIRECT_URI = 'musicbox://login';
 const BACKEND_URL = 'https://musicboxdback.onrender.com';
 
 export default function LoginScreen() {
