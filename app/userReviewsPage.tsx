@@ -21,7 +21,7 @@ export default function UserReviewsPage() {
 
   const fetchUserReviews = async (userId: string) => {
     try {
-      const resp = await axios.get(`https://musicboxdback.onrender.com/review/user/${userId}`);
+      const resp = await axios.get(`http://212.85.23.87:3000/review/user/${userId}`);
       const arr: Review[] = resp.data;
       const sorted = Array.isArray(arr)
         ? arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

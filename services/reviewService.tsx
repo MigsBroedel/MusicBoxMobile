@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = "https://musicboxdback.onrender.com"; // Substitua pela sua URL da API
+const API_BASE_URL = "http://212.85.23.87:3000"; // Substitua pela sua URL da API
 
 class ReviewService {
   // Função para pegar reviews das pessoas que o usuário segue

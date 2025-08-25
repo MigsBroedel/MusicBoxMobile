@@ -33,8 +33,8 @@ export default function FollowersPage() {
       setCurrentUserId(storedId);
 
       const endpoint = type === "followers" 
-        ? `https://musicboxdback.onrender.com/followers/${userId}`
-        : `https://musicboxdback.onrender.com/following/${userId}`;
+        ? `http://212.85.23.87:3000/followers/${userId}`
+        : `http://212.85.23.87:3000/following/${userId}`;
 
       const response = await fetch(endpoint);
       

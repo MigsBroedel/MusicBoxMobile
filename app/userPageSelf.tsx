@@ -134,7 +134,7 @@ export default function UserPage() {
       setLoading(true);
       setError(null);
 
-      const resp = await fetch(`https://musicboxdback.onrender.com/users/${id}`);
+      const resp = await fetch(`http://212.85.23.87:3000/users/${id}`);
       if (!resp.ok) throw new Error("Erro ao buscar usuário");
       const data: UserProfile = await resp.json();
       setUser(data);
@@ -142,8 +142,8 @@ export default function UserPage() {
 
       // Buscar contadores em paralelo
       const [followersRes, followingRes] = await Promise.all([
-        fetch(`https://musicboxdback.onrender.com/followers/count/${id}`),
-        fetch(`https://musicboxdback.onrender.com/following/count/${id}`)
+        fetch(`http://212.85.23.87:3000/followers/count/${id}`),
+        fetch(`http://212.85.23.87:3000/following/count/${id}`)
       ]);
 
       if (followersRes.ok) {
@@ -264,7 +264,7 @@ export default function UserPage() {
 
   const fetchUserReviews = async (userId: string) => {
     try {
-      const resp = await axios.get(`https://musicboxdback.onrender.com/review/user/${userId}`);
+      const resp = await axios.get(`http://212.85.23.87:3000/review/user/${userId}`);
       
       const arr: Review[] = await resp.data
       console.log(resp.data)

@@ -40,7 +40,7 @@ const discovery = {
 
 const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
 const REDIRECT_URI = 'musicbox://login';
-const BACKEND_URL = 'https://musicboxdback.onrender.com';
+const BACKEND_URL = 'http://212.85.23.87:3000';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -168,7 +168,7 @@ export default function LoginScreen() {
 
   const userLogProccessSpotify = async (spotifyID: string, name?: string) => {
   try {
-    const res = await fetch(`https://musicboxdback.onrender.com/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
+    const res = await fetch(`http://212.85.23.87:3000/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
