@@ -68,10 +68,9 @@ export default function LoginScreen() {
         'user-read-playback-state',
         'user-modify-playback-state'
       ],
-
       redirectUri: REDIRECT_URI,
       responseType: AuthSession.ResponseType.Code,
-      usePKCE: true, // Importante: ativar PKCE
+      usePKCE: true,
       extraParams: {
         code_challenge_method: 'S256'
       }
@@ -104,45 +103,56 @@ export default function LoginScreen() {
       }
 
       addLoginStep('🔄 Trocando código por tokens...', 'info');
+      addLoginStep(`🌐 Backend URL: ${BACKEND_URL}`, 'info');
 
-      // Enviar para o backend
-      const tokenResponse = await axios.post(`${BACKEND_URL}/auth/callback`, {
+      // Debug: Log dos dados que serão enviados
+      const requestData = {
         code: authCode,
         codeVerifier: request.codeVerifier,
         redirect_uri: REDIRECT_URI
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 15000
-      });
-
-      console.log(tokenResponse.data)
-
-      const tokens: SpotifyTokenResponse = tokenResponse.data;
-      addLoginStep('🎉 Tokens recebidos com sucesso!', 'success');
-
-      console.log("Access Token recebido:", tokens.access_token);
-
-      // Salvar tokens localmente
-      await AsyncStorage.multiSet([
-        ['accessToken', tokens.access_token],
-        ['refreshToken', tokens.refresh_token],
-        ['spotify_expires_in', tokens.expires_in.toString()],
-        ['spotify_token_timestamp', Date.now().toString()]
-      ]);
-
-      addLoginStep('💾 Tokens salvos localmente', 'success');
-
-      // Buscar dados do usuário
-      await fetchUserData(tokens.access_token);
-
-      // Navegar para a tela principal
-      addLoginStep('🚀 Login completo! Redirecionando...', 'success');
+      };
       
-      setTimeout(() => {
-        router.replace('/home'); // Ou a tela que você quiser
-      }, 2000);
+      addLoginStep(`📤 Enviando dados para backend...`, 'info');
+      console.log('Dados do request:', requestData);
+
+      // Primeira tentativa com axios
+      try {
+        const tokenResponse = await axios.post(`${BACKEND_URL}/auth/callback`, requestData, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          timeout: 20000, // Aumentado para 20 segundos
+          validateStatus: function (status) {
+            return status < 500; // Resolve apenas se status < 500
+          }
+        });
+
+        console.log('Response status:', tokenResponse.status);
+        console.log('Response data:', tokenResponse.data);
+
+        if (tokenResponse.status >= 400) {
+          throw new Error(`HTTP ${tokenResponse.status}: ${JSON.stringify(tokenResponse.data)}`);
+        }
+
+        const tokens: SpotifyTokenResponse = tokenResponse.data;
+        addLoginStep('🎉 Tokens recebidos com sucesso!', 'success');
+        
+        await processTokens(tokens);
+        
+      } catch (axiosError: any) {
+        console.error('Erro do Axios:', axiosError);
+        
+        if (axiosError.code === 'ECONNABORTED') {
+          addLoginStep('⏰ Timeout na conexão com o servidor', 'error');
+          throw new Error('Timeout na conexão');
+        } else if (axiosError.code === 'NETWORK_ERROR' || axiosError.message?.includes('Network Error')) {
+          addLoginStep('🌐 Erro de rede detectado, tentando fetch nativo...', 'info');
+          await tryNativeFetch(requestData);
+        } else {
+          throw axiosError;
+        }
+      }
 
     } catch (error: any) {
       console.error('Erro completo:', error);
@@ -150,7 +160,6 @@ export default function LoginScreen() {
       let errorMessage = 'Erro desconhecido';
       
       if (error.response?.data) {
-        // Erro do backend
         const backendError = error.response.data;
         if (backendError.spotify_error) {
           errorMessage = `Spotify API: ${backendError.spotify_error.error_description || backendError.spotify_error.error || 'Erro na API'}`;
@@ -166,32 +175,96 @@ export default function LoginScreen() {
     }
   };
 
-  const userLogProccessSpotify = async (spotifyID: string, name?: string) => {
-  try {
-    const res = await fetch(`http://212.85.23.87:3000/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  // Função alternativa usando fetch nativo
+  const tryNativeFetch = async (requestData: any) => {
+    try {
+      addLoginStep('🔄 Tentando conexão com fetch nativo...', 'info');
+      
+      const response = await fetch(`${BACKEND_URL}/auth/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
 
-    if (!res.ok) {
-      throw new Error(`Erro: ${res.status}`);
+      addLoginStep(`📡 Status da resposta: ${response.status}`, 'info');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const tokens = await response.json();
+      addLoginStep('🎉 Tokens recebidos com fetch nativo!', 'success');
+      
+      await processTokens(tokens);
+      
+    } catch (fetchError: any) {
+      console.error('Erro do fetch nativo:', fetchError);
+      addLoginStep(`❌ Erro no fetch nativo: ${fetchError.message}`, 'error');
+      throw fetchError;
     }
+  };
 
-    const user = await res.json();
-    console.log("Usuário retornado:", user);
-    return user;
-  } catch (err) {
-    console.error("Erro no login:", err);
+  // Função para processar os tokens recebidos
+  const processTokens = async (tokens: SpotifyTokenResponse) => {
+    console.log("Access Token recebido:", tokens.access_token);
+
+    // Salvar tokens localmente
+    await AsyncStorage.multiSet([
+      ['accessToken', tokens.access_token],
+      ['refreshToken', tokens.refresh_token],
+      ['spotify_expires_in', tokens.expires_in.toString()],
+      ['spotify_token_timestamp', Date.now().toString()]
+    ]);
+
+    addLoginStep('💾 Tokens salvos localmente', 'success');
+
+    // Buscar dados do usuário
+    await fetchUserData(tokens.access_token);
+
+    // Navegar para a tela principal
+    addLoginStep('🚀 Login completo! Redirecionando...', 'success');
+    
+    setTimeout(() => {
+      router.replace('/home');
+    }, 2000);
+  };
+
+  const userLogProccessSpotify = async (spotifyID: string, name?: string) => {
+    try {
+      addLoginStep('👤 Processando usuário no backend...', 'info');
+      
+      const res = await fetch(`${BACKEND_URL}/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        }
+      
+      });
+
+      if (!res.ok) {
+        throw new Error(`Erro no logProcess: ${res.status}`);
+      }
+
+      const user = await res.json();
+      console.log("Usuário retornado:", user);
+      addLoginStep('✅ Usuário processado com sucesso', 'success');
+      return user;
+    } catch (err) {
+      console.error("Erro no login:", err);
+      addLoginStep(`⚠️ Erro ao processar usuário: ${err}`, 'error');
+      throw err;
+    }
   }
-}
 
   const fetchUserData = async (accessToken: string) => {
     try {
-      addLoginStep('👤 Buscando dados do usuário...', 'info');
+      addLoginStep('👤 Buscando dados do usuário no Spotify...', 'info');
 
-      console.log(accessToken)
+      console.log('Access token para buscar usuário:', accessToken);
       
       const userResponse = await axios.get('https://api.spotify.com/v1/me', {
         headers: {
@@ -201,20 +274,20 @@ export default function LoginScreen() {
         timeout: 10000
       });
 
-
       const userData = userResponse.data;
+      addLoginStep(`✅ Dados do Spotify obtidos para: ${userData.display_name}`, 'success');
 
-      const responseProccess = await userLogProccessSpotify(userData.id, userData.display_name)
+      const responseProccess = await userLogProccessSpotify(userData.id, userData.display_name);
 
-      console.log(responseProccess)
+      console.log('Response do logProcess:', responseProccess);
 
-      await AsyncStorage.setItem("userid", responseProccess.id)
+      await AsyncStorage.setItem("userid", responseProccess.id);
       
       // Salvar dados do usuário
       await AsyncStorage.setItem('user_data', JSON.stringify({
         id: userData.id,
         display_name: userData.display_name || 'Usuário Spotify',
-        email: userData.email || `${userData.id}@spotify.local`, // fallback
+        email: userData.email || `${userData.id}@spotify.local`,
         country: userData.country,
         followers: userData.followers?.total || 0,
         images: userData.images || []
@@ -223,7 +296,6 @@ export default function LoginScreen() {
       addLoginStep(`✅ Bem-vindo, ${userData.display_name || userData.id}!`, 'success');
 
     } catch (error: any) {
-      
       console.error('Erro ao buscar dados do usuário:', error);
       addLoginStep('⚠️ Erro ao buscar dados do usuário, mas login foi bem-sucedido', 'error');
     }
@@ -235,6 +307,7 @@ export default function LoginScreen() {
     setLoginSteps([]);
     setIsLoading(true);
     addLoginStep('🎵 Iniciando autenticação com Spotify...', 'info');
+  
     
     try {
       await promptAsync();
