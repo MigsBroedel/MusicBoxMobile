@@ -9,6 +9,8 @@ import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import axios from 'axios';
+import { Colors } from 'react-native/Libraries/NewAppScreen';
+import { colors } from 'react-native-elements';
 
 interface LoginStep {
   message: string;
@@ -40,12 +42,20 @@ const discovery = {
 
 const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
 const REDIRECT_URI = 'musicbox://login';
-const BACKEND_URL = 'http://212.85.23.87:3000';
+
+// URLs do backend para testar (adicione sua URL local aqui)
+const BACKEND_URLS = [
+  'http://212.85.23.87:3000',    // URL original
+  'http://192.168.1.100:3000',  // Substitua pelo seu IP local
+  'http://10.0.2.2:3000',       // Para Android Emulator
+  'http://localhost:3000',      // Para teste local
+];
 
 export default function LoginScreen() {
   const navigation = useNavigation();
   const [loginSteps, setLoginSteps] = useState<LoginStep[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [backendUrl, setBackendUrl] = useState<string>(BACKEND_URLS[0]);
 
   // Função para adicionar step de login
   const addLoginStep = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
@@ -78,6 +88,35 @@ export default function LoginScreen() {
     discovery
   );
 
+  // Função para testar conectividade com o backend
+  const testBackendConnection = async (): Promise<string | null> => {
+    addLoginStep('🔍 Testando conectividade com o backend...', 'info');
+    
+    for (const url of BACKEND_URLS) {
+      try {
+        addLoginStep(`🌐 Testando: ${url}`, 'info');
+        
+        const response = await fetch(`${url}/auth/health`, {
+          method: 'GET',
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          addLoginStep(`✅ Backend conectado: ${url}`, 'success');
+          setBackendUrl(url);
+          return url;
+        } else {
+          addLoginStep(`⚠️ Backend respondeu com status ${response.status}: ${url}`, 'error');
+        }
+      } catch (error: any) {
+        addLoginStep(`❌ Falha ao conectar: ${url} - ${error.message}`, 'error');
+      }
+    }
+    
+    addLoginStep('❌ Nenhum backend disponível encontrado', 'error');
+    return null;
+  };
+
   // Handle Spotify OAuth response
   useEffect(() => {
     if (response?.type === 'success') {
@@ -102,8 +141,13 @@ export default function LoginScreen() {
         throw new Error('Code verifier não encontrado. Tente fazer login novamente.');
       }
 
+      // Testar conectividade primeiro
+      const availableBackend = await testBackendConnection();
+      if (!availableBackend) {
+        throw new Error('Nenhum backend disponível. Verifique sua conexão.');
+      }
+
       addLoginStep('🔄 Trocando código por tokens...', 'info');
-      addLoginStep(`🌐 Backend URL: ${BACKEND_URL}`, 'info');
 
       // Debug: Log dos dados que serão enviados
       const requestData = {
@@ -112,84 +156,81 @@ export default function LoginScreen() {
         redirect_uri: REDIRECT_URI
       };
       
-      addLoginStep(`📤 Enviando dados para backend...`, 'info');
-      console.log('Dados do request:', requestData);
+      addLoginStep(`📤 Enviando dados para: ${availableBackend}`, 'info');
 
-      // Primeira tentativa com axios
-      try {
-        const tokenResponse = await axios.post(`${BACKEND_URL}/auth/callback`, requestData, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          timeout: 20000, // Aumentado para 20 segundos
-          validateStatus: function (status) {
-            return status < 500; // Resolve apenas se status < 500
-          }
-        });
-
-        console.log('Response status:', tokenResponse.status);
-        console.log('Response data:', tokenResponse.data);
-
-        if (tokenResponse.status >= 400) {
-          throw new Error(`HTTP ${tokenResponse.status}: ${JSON.stringify(tokenResponse.data)}`);
-        }
-
-        const tokens: SpotifyTokenResponse = tokenResponse.data;
-        addLoginStep('🎉 Tokens recebidos com sucesso!', 'success');
-        
-        await processTokens(tokens);
-        
-      } catch (axiosError: any) {
-        console.error('Erro do Axios:', axiosError);
-        
-        if (axiosError.code === 'ECONNABORTED') {
-          addLoginStep('⏰ Timeout na conexão com o servidor', 'error');
-          throw new Error('Timeout na conexão');
-        } else if (axiosError.code === 'NETWORK_ERROR' || axiosError.message?.includes('Network Error')) {
-          addLoginStep('🌐 Erro de rede detectado, tentando fetch nativo...', 'info');
-          await tryNativeFetch(requestData);
-        } else {
-          throw axiosError;
-        }
-      }
+      // Tentar com diferentes métodos
+      await tryMultipleMethods(requestData, availableBackend);
 
     } catch (error: any) {
       console.error('Erro completo:', error);
-      
-      let errorMessage = 'Erro desconhecido';
-      
-      if (error.response?.data) {
-        const backendError = error.response.data;
-        if (backendError.spotify_error) {
-          errorMessage = `Spotify API: ${backendError.spotify_error.error_description || backendError.spotify_error.error || 'Erro na API'}`;
-        } else {
-          errorMessage = `Backend: ${backendError.message || 'Erro no servidor'}`;
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      addLoginStep(`❌ Falha na autenticação: ${errorMessage}`, 'error');
+      addLoginStep(`❌ Falha na autenticação: ${error.message}`, 'error');
       setIsLoading(false);
     }
   };
 
-  // Função alternativa usando fetch nativo
-  const tryNativeFetch = async (requestData: any) => {
+  // Função para tentar diferentes métodos de conexão
+  const tryMultipleMethods = async (requestData: any, backendUrl: string) => {
+    const methods = [
+      { name: 'Axios com timeout baixo', fn: () => tryAxios(requestData, backendUrl, 8000) },
+      { name: 'Fetch nativo', fn: () => tryNativeFetch(requestData, backendUrl) },
+      { name: 'Axios com timeout alto', fn: () => tryAxios(requestData, backendUrl, 15000) },
+    ];
+
+    for (const method of methods) {
+      try {
+        addLoginStep(`🔄 Tentando: ${method.name}...`, 'info');
+        await method.fn();
+        return; // Se chegou aqui, deu certo
+      } catch (error: any) {
+        addLoginStep(`❌ ${method.name} falhou: ${error.message}`, 'error');
+        
+        if (method === methods[methods.length - 1]) {
+          throw error; // Se foi o último método, propaga o erro
+        }
+      }
+    }
+  };
+
+  // Método com Axios
+  const tryAxios = async (requestData: any, backendUrl: string, timeout: number = 10000) => {
+    const response = await axios.post(`${backendUrl}/auth/callback`, requestData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+      },
+      timeout,
+      validateStatus: function (status) {
+        return status < 500;
+      }
+    });
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+    }
+
+    addLoginStep('🎉 Tokens recebidos via Axios!', 'success');
+    await processTokens(response.data);
+  };
+
+  // Método com fetch nativo
+  const tryNativeFetch = async (requestData: any, backendUrl: string) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
-      addLoginStep('🔄 Tentando conexão com fetch nativo...', 'info');
-      
-      const response = await fetch(`${BACKEND_URL}/auth/callback`, {
+      const response = await fetch(`${backendUrl}/auth/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
         },
         body: JSON.stringify(requestData),
+        signal: controller.signal,
       });
 
-      addLoginStep(`📡 Status da resposta: ${response.status}`, 'info');
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -197,20 +238,16 @@ export default function LoginScreen() {
       }
 
       const tokens = await response.json();
-      addLoginStep('🎉 Tokens recebidos com fetch nativo!', 'success');
-      
+      addLoginStep('🎉 Tokens recebidos via fetch nativo!', 'success');
       await processTokens(tokens);
-      
-    } catch (fetchError: any) {
-      console.error('Erro do fetch nativo:', fetchError);
-      addLoginStep(`❌ Erro no fetch nativo: ${fetchError.message}`, 'error');
-      throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
   // Função para processar os tokens recebidos
   const processTokens = async (tokens: SpotifyTokenResponse) => {
-    console.log("Access Token recebido:", tokens.access_token);
+    console.log("Access Token recebido:", tokens.access_token?.substring(0, 20) + '...');
 
     // Salvar tokens localmente
     await AsyncStorage.multiSet([
@@ -237,12 +274,11 @@ export default function LoginScreen() {
     try {
       addLoginStep('👤 Processando usuário no backend...', 'info');
       
-      const res = await fetch(`${BACKEND_URL}/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
+      const res = await fetch(`${backendUrl}/users/logProcess/${spotifyID}?name=${encodeURIComponent(name || "")}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         }
-      
       });
 
       if (!res.ok) {
@@ -250,7 +286,6 @@ export default function LoginScreen() {
       }
 
       const user = await res.json();
-      console.log("Usuário retornado:", user);
       addLoginStep('✅ Usuário processado com sucesso', 'success');
       return user;
     } catch (err) {
@@ -263,8 +298,6 @@ export default function LoginScreen() {
   const fetchUserData = async (accessToken: string) => {
     try {
       addLoginStep('👤 Buscando dados do usuário no Spotify...', 'info');
-
-      console.log('Access token para buscar usuário:', accessToken);
       
       const userResponse = await axios.get('https://api.spotify.com/v1/me', {
         headers: {
@@ -278,8 +311,6 @@ export default function LoginScreen() {
       addLoginStep(`✅ Dados do Spotify obtidos para: ${userData.display_name}`, 'success');
 
       const responseProccess = await userLogProccessSpotify(userData.id, userData.display_name);
-
-      console.log('Response do logProcess:', responseProccess);
 
       await AsyncStorage.setItem("userid", responseProccess.id);
       
@@ -307,7 +338,6 @@ export default function LoginScreen() {
     setLoginSteps([]);
     setIsLoading(true);
     addLoginStep('🎵 Iniciando autenticação com Spotify...', 'info');
-  
     
     try {
       await promptAsync();
@@ -332,7 +362,6 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.overlay}>
-      {/* Liquid Glass Effect Container */}
       <BlurView intensity={30} tint="dark" style={styles.glassContainer}>
         <LinearGradient
           colors={['rgba(10, 17, 0, 0.99)', 'rgba(34, 34, 34, 1)']}
@@ -369,6 +398,9 @@ export default function LoginScreen() {
               </LinearGradient>
             </BlurView>
           </TouchableOpacity>
+
+          {/* Current Backend URL Display */}
+          <Text style={{color: colors.grey2}}>Backend: {backendUrl}</Text>
 
           {/* Login Steps Display */}
           {loginSteps.length > 0 && (
