@@ -45,7 +45,7 @@ const REDIRECT_URI = 'musicbox://login';
 
 // URLs do backend para testar (adicione sua URL local aqui)
 const BACKEND_URLS = [
-  'http://212.85.23.87:3000',    // URL original
+  'https://musicboxdback.onrender.com',    // URL original
   'http://192.168.1.100:3000',  // Substitua pelo seu IP local
   'http://10.0.2.2:3000',       // Para Android Emulator
   'http://localhost:3000',      // Para teste local
@@ -135,6 +135,7 @@ export default function LoginScreen() {
     try {
       addLoginStep('✅ Código de autorização recebido!', 'success');
       addLoginStep(`📝 Código: ${authCode.substring(0, 20)}...`, 'info');
+      console.log(authCode)
       
       // Verificar se temos o codeVerifier
       if (!request?.codeVerifier) {
