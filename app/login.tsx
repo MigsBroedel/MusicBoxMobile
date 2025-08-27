@@ -45,10 +45,7 @@ const REDIRECT_URI = 'musicbox://login';
 
 // URLs do backend para testar (adicione sua URL local aqui)
 const BACKEND_URLS = [
-  'https://212.85.23.87',    // URL original
-  'http://192.168.1.100:3000',  // Substitua pelo seu IP local
-  'http://10.0.2.2:3000',       // Para Android Emulator
-  'http://localhost:3000',      // Para teste local
+  'http://212.85.23.87:3000',  // HTTP na porta 3000 (fallback)
 ];
 
 export default function LoginScreen() {

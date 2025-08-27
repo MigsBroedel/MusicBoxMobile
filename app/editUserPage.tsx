@@ -78,7 +78,7 @@ export default function EditUserPage() {
       if (themeColor) setSelectedColor(themeColor);
 
       if (userid) {
-        const response = await axios.get(`https://212.85.23.87/users/${userid}`);
+        const response = await axios.get(`http://212.85.23.87:3000/users/${userid}`);
         setUser(response.data);
         setName(response.data.name || "");
         setBio(response.data.bio || "");
@@ -118,7 +118,7 @@ export default function EditUserPage() {
       type: `image/${fileType}`,
     } as any);
     try {
-      const response = await fetch("https://212.85.23.87/cloudinary/upload", {
+      const response = await fetch("http://212.85.23.87:3000/cloudinary/upload", {
         method: "POST",
         body: formData,
       });
@@ -148,7 +148,7 @@ export default function EditUserPage() {
         const imageUrl = await uploadImage();
         if (imageUrl) updateData.pfp = imageUrl;
       }
-      await axios.patch(`https://212.85.23.87/users/${userid}`, updateData);
+      await axios.patch(`http://212.85.23.87:3000/users/${userid}`, updateData);
       Alert.alert("Sucesso!", "Seu perfil foi atualizado!", [
         { text: "Ok", onPress: () => router.back() }
       ]);

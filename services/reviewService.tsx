@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = "https://212.85.23.87"; // Substitua pela sua URL da API
+const API_BASE_URL = "http://212.85.23.87:3000"; // Substitua pela sua URL da API
 
 class ReviewService {
   // Função para pegar reviews das pessoas que o usuário segue

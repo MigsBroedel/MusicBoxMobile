@@ -69,7 +69,7 @@ type FilterType = 'all' | 'album' | 'single';
 // Função para buscar dados do usuário
 const fetchUserData = async (userId: string): Promise<UserData> => {
   try {
-    const response = await axios.get(`https://212.85.23.87/users/${userId}`);
+    const response = await axios.get(`http://212.85.23.87:3000/users/${userId}`);
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar dados do usuário:', error);
@@ -334,7 +334,7 @@ export default function ArtistPage() {
       };
       console.log(userId, updatedUser)
 
-      const response = await axios.patch(`https://212.85.23.87/users/${userId}`, updatedUser);
+      const response = await axios.patch(`http://212.85.23.87:3000/users/${userId}`, updatedUser);
       console.log("Usuário atualizado:", response.data);
 
       // Atualizar o estado local

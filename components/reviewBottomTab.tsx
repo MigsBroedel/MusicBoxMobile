@@ -46,7 +46,7 @@ export default function BottomSheet({
       };
 
       const response = await axios.post(
-        `https://212.85.23.87/review`,
+        `http://212.85.23.87:3000/review`,
         review
       );
 
