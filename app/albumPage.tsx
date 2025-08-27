@@ -178,7 +178,7 @@ const AlbumDetailScreen: React.FC = () => {
 
   const fetchReviews = async () => {
       try {
-        const response = await fetch(`http://212.85.23.87:3000/review/album/${id}`);
+        const response = await fetch(`https://212.85.23.87/review/album/${id}`);
 
         if (response.ok) {
           const data = await response.json();
@@ -230,7 +230,7 @@ const AlbumDetailScreen: React.FC = () => {
 
   const fetchUserData = async (userId: string): Promise<UserData> => {
   try {
-    const response = await axios.get(`http://212.85.23.87:3000/users/${userId}`);
+    const response = await axios.get(`https://212.85.23.87/users/${userId}`);
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar dados do usuário:', error);
@@ -278,7 +278,7 @@ const AlbumDetailScreen: React.FC = () => {
       }
 
       // Faz o PATCH para atualizar os favoritos
-      const response = await axios.patch(`http://212.85.23.87:3000/users/${userId}`, {
+      const response = await axios.patch(`https://212.85.23.87/users/${userId}`, {
         favoriteAlbums: updatedFavorites
       });
 

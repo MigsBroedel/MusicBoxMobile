@@ -45,7 +45,7 @@ const REDIRECT_URI = 'musicbox://login';
 
 // URLs do backend para testar (adicione sua URL local aqui)
 const BACKEND_URLS = [
-  'https://musicboxdback.onrender.com',    // URL original
+  'https://212.85.23.87',    // URL original
   'http://192.168.1.100:3000',  // Substitua pelo seu IP local
   'http://10.0.2.2:3000',       // Para Android Emulator
   'http://localhost:3000',      // Para teste local
@@ -132,42 +132,61 @@ export default function LoginScreen() {
   }, [response]);
 
   const handleSuccessfulAuth = async (authCode: string) => {
-    try {
-      addLoginStep('✅ Código de autorização recebido!', 'success');
-      addLoginStep(`📝 Código: ${authCode.substring(0, 20)}...`, 'info');
-      console.log(authCode)
-      
-      // Verificar se temos o codeVerifier
-      if (!request?.codeVerifier) {
-        throw new Error('Code verifier não encontrado. Tente fazer login novamente.');
-      }
-
-      // Testar conectividade primeiro
-      const availableBackend = await testBackendConnection();
-      if (!availableBackend) {
-        throw new Error('Nenhum backend disponível. Verifique sua conexão.');
-      }
-
-      addLoginStep('🔄 Trocando código por tokens...', 'info');
-
-      // Debug: Log dos dados que serão enviados
-      const requestData = {
-        code: authCode,
-        codeVerifier: request.codeVerifier,
-        redirect_uri: REDIRECT_URI
-      };
-      
-      addLoginStep(`📤 Enviando dados para: ${availableBackend}`, 'info');
-
-      // Tentar com diferentes métodos
-      await tryMultipleMethods(requestData, availableBackend);
-
-    } catch (error: any) {
-      console.error('Erro completo:', error);
-      addLoginStep(`❌ Falha na autenticação: ${error.message}`, 'error');
-      setIsLoading(false);
+  try {
+    addLoginStep('✅ Código de autorização recebido!', 'success');
+    
+    if (!request?.codeVerifier) {
+      throw new Error('Code verifier não encontrado');
     }
-  };
+
+    const availableBackend = await testBackendConnection();
+    if (!availableBackend) {
+      throw new Error('Nenhum backend disponível');
+    }
+
+    addLoginStep('🔄 Trocando código por tokens...', 'info');
+
+    // Dados para PKCE
+    const requestData = {
+      code: authCode,
+      codeVerifier: request.codeVerifier,
+      redirect_uri: REDIRECT_URI
+    };
+
+    // Use fetch para melhor controle
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch(`${availableBackend}/auth/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const tokens = await response.json();
+      await processTokens(tokens);
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+
+  } catch (error: any) {
+    addLoginStep(`❌ Erro: ${error.message}`, 'error');
+    setIsLoading(false);
+  }
+};
 
   // Função para tentar diferentes métodos de conexão
   const tryMultipleMethods = async (requestData: any, backendUrl: string) => {

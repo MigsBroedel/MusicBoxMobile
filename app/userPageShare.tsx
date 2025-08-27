@@ -90,7 +90,7 @@ type UserProfile = {
 
 async function isUserFollowed(currentUserId: string, targetUserId: string): Promise<boolean> {
   try {
-    const response = await fetch(`http://212.85.23.87:3000/followers/${targetUserId}`, {
+    const response = await fetch(`https://212.85.23.87/followers/${targetUserId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -144,15 +144,15 @@ export default function UserPage() {
       setCurrentUserId(storedId);
 
       // Buscar dados do usuário
-      const res = await fetch(`http://212.85.23.87:3000/users/${userId}`);
+      const res = await fetch(`https://212.85.23.87/users/${userId}`);
       if (!res.ok) throw new Error(`Erro ao buscar usuário: ${res.status}`);
       const data = await res.json();
       setUser(data);
 
       // Buscar contadores em paralelo
       const [followersRes, followingRes] = await Promise.all([
-        fetch(`http://212.85.23.87:3000/followers/count/${userId}`),
-        fetch(`http://212.85.23.87:3000/following/count/${userId}`)
+        fetch(`https://212.85.23.87/followers/count/${userId}`),
+        fetch(`https://212.85.23.87/following/count/${userId}`)
       ]);
 
       if (followersRes.ok) {
@@ -285,7 +285,7 @@ export default function UserPage() {
 
   const fetchUserReviews = async (userId: string) => {
     try {
-      const resp = await fetch(`http://212.85.23.87:3000/review/user/${userId}`);
+      const resp = await fetch(`https://212.85.23.87/review/user/${userId}`);
       if (!resp.ok) throw new Error(`Erro ao buscar reviews: ${resp.status}`);
       const arr: Review[] = await resp.json();
       setReviews(Array.isArray(arr) ? arr : []);
@@ -300,7 +300,7 @@ export default function UserPage() {
     if (!userId) return;
     
     try {
-      const res = await fetch(`http://212.85.23.87:3000/follow`, {
+      const res = await fetch(`https://212.85.23.87/follow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -323,7 +323,7 @@ export default function UserPage() {
     if (!userId) return;
     
     try {
-      const res = await fetch(`http://212.85.23.87:3000/unfollow`, {
+      const res = await fetch(`https://212.85.23.87/unfollow`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

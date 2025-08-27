@@ -34,7 +34,7 @@ interface User {
   bio?: string;
 }
 
-const API_BASE_URL = 'http://212.85.23.87:3000'; // Substitua pelo seu host real
+const API_BASE_URL = 'https://212.85.23.87'; // Substitua pelo seu host real
 
 const UserCard: React.FC<{ user: User; onPress: (userId: string) => void }> = ({ user, onPress }) => (
   <TouchableOpacity
@@ -74,7 +74,7 @@ const SearchUsersScreen: React.FC = () => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`http://212.85.23.87:3000/users?name=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(`https://212.85.23.87/users?name=${encodeURIComponent(searchQuery)}`);
         const data = await res.json();
         setFilteredUsers(data);
       } catch (error) {

@@ -44,7 +44,7 @@ class TokenManager {
 
       console.log('🔄 Renovando access token...');
       
-      const response = await fetch('http://212.85.23.87:3000/auth/refresh', {
+      const response = await fetch('https://212.85.23.87/auth/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
