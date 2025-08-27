@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import axios from 'axios';
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import { colors } from 'react-native-elements';
+import TestConnection from '../components/testComponent';
 
 interface LoginStep {
   message: string;
@@ -89,26 +90,26 @@ export default function LoginScreen() {
   const testBackendConnection = async (): Promise<string | null> => {
     addLoginStep('🔍 Testando conectividade com o backend...', 'info');
     
-    for (const url of BACKEND_URLS) {
+    
       try {
-        addLoginStep(`🌐 Testando: ${url}`, 'info');
+        addLoginStep(`🌐 Testando: http://212.85.23.87:3000`, 'info');
         
-        const response = await fetch(`${url}/auth/health`, {
+        const response = await fetch(`http://212.85.23.87:3000/auth/health`, {
           method: 'GET',
         });
         
         if (response.ok) {
           const data = await response.json();
-          addLoginStep(`✅ Backend conectado: ${url}`, 'success');
-          setBackendUrl(url);
-          return url;
+          addLoginStep(`✅ Backend conectado: http://212.85.23.87:3000`, 'success');
+          setBackendUrl('http://212.85.23.87:3000');
+          return 'http://212.85.23.87:3000';
         } else {
-          addLoginStep(`⚠️ Backend respondeu com status ${response.status}: ${url}`, 'error');
+          addLoginStep(`⚠️ Backend respondeu com status ${response.status}: http://212.85.23.87:3000`, 'error');
         }
       } catch (error: any) {
-        addLoginStep(`❌ Falha ao conectar: ${url} - ${error.message}`, 'error');
+        addLoginStep(`❌ Falha ao conectar: http://212.85.23.87:3000 - ${error.message}`, 'error');
       }
-    }
+    
     
     addLoginStep('❌ Nenhum backend disponível encontrado', 'error');
     return null;
@@ -388,6 +389,8 @@ export default function LoginScreen() {
         <View style={styles.contentContainer}>
           <Image source={require('../assets/icon.png')} style={{height: 150, width: 150, borderRadius: 15}}/>
           <Text style={styles.title}>Syntha</Text>
+
+          <TestConnection />
           
           {/* Spotify Login Button */}
           <TouchableOpacity 
@@ -396,6 +399,7 @@ export default function LoginScreen() {
             activeOpacity={0.8}
             disabled={isLoading}
           >
+            
             <BlurView intensity={20} tint="light" style={styles.buttonBlur}>
               <LinearGradient
                 colors={isLoading ? 
