@@ -42,7 +42,7 @@ const discovery = {
 };
 
 const CLIENT_ID = 'f1279cc7c8c246f49bad620c58811730';
-const REDIRECT_URI = 'musicbox://login';
+const REDIRECT_URI = 'musicbox://login'; //musicbox://login
 
 // URLs do backend para testar (adicione sua URL local aqui)
 const BACKEND_URLS = [
@@ -156,7 +156,7 @@ export default function LoginScreen() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await fetch(`${availableBackend}/auth/callback`, {
+      const response = await fetch(`http://212.85.23.87:3000/auth/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
