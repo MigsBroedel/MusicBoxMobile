@@ -390,7 +390,7 @@ export default function LoginScreen() {
           <Image source={require('../assets/icon.png')} style={{height: 150, width: 150, borderRadius: 15}}/>
           <Text style={styles.title}>Syntha</Text>
 
-          <TestConnection />
+          
           
           {/* Spotify Login Button */}
           <TouchableOpacity 
